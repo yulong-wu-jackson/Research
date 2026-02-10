@@ -2,7 +2,7 @@
 
 **Created:** 2026-02-06
 **Updated:** 2026-02-07
-**Status:** Draft
+**Status:** Complete
 **Depends on:** None (first ticket)
 **Blocks:** All subsequent tickets
 
@@ -20,7 +20,7 @@ Set up the Python project from scratch: dependency management via `uv`, director
 
 ## Requirements
 
-- [ ] Create `pyproject.toml` with all project dependencies (pinned to latest stable versions verified for Python 3.13 compatibility):
+- [x] Create `pyproject.toml` with all project dependencies (pinned to latest stable versions verified for Python 3.13 compatibility):
   - **Core:**
     - `torch>=2.6.0` — Python 3.13 + torch.compile support added in 2.6; CUDA 12.x compatible (latest: 2.10.0, Jan 2026)
     - `transformers>=4.51.0,<5.0.0` — v5.0 has breaking changes (TF/JAX removed, reported gibberish bugs); pin to 4.x stable line (latest: 4.57.x). v5.x can be revisited once mature.
@@ -50,11 +50,11 @@ Set up the Python project from scratch: dependency management via `uv`, director
     - `pytest>=8.3.0` — latest 9.0.2; full Python 3.13 support
     - `pytest-cov>=6.0.0` — latest 7.0.0 (Sep 2025)
     - `ruff>=0.9.0` — latest 0.15.0 (Feb 2026); Rust binary, no Python version dep
-- [ ] Create `.python-version` pinning Python 3.13
-- [ ] Create full directory structure: `src/unimoe/` with subpackages `data/`, `model/`, `training/`, `evaluation/`, `analysis/`; plus `configs/`, `scripts/`, `tests/`
-- [ ] Update `.gitignore` to exclude `outputs/`, `data/`, `__pycache__/`, `.venv/`, `wandb/`, `*.egg-info/`, `.cache/`
-- [ ] Run `uv sync` and verify all deps install correctly
-- [ ] Implement `src/unimoe/config.py`:
+- [x] Create `.python-version` pinning Python 3.13
+- [x] Create full directory structure: `src/unimoe/` with subpackages `data/`, `model/`, `training/`, `evaluation/`, `analysis/`; plus `configs/`, `scripts/`, `tests/`
+- [x] Update `.gitignore` to exclude `outputs/`, `data/`, `__pycache__/`, `.venv/`, `wandb/`, `*.egg-info/`, `.cache/`
+- [x] Run `uv sync` and verify all deps install correctly
+- [x] Implement `src/unimoe/config.py`:
   - `ModelConfig`: base_model_name, torch_dtype, device
   - `LoRAConfig`: rank, alpha, dropout, target_modules (list), task_type
   - `DataConfig`: dataset_name, embedding_samples, reranking_samples, query_max_len, passage_max_len, reranking_max_len, num_hard_negatives, instruction_prefix
@@ -65,7 +65,7 @@ Set up the Python project from scratch: dependency management via `uv`, director
   - `ScoringMode` enum: `YES_NO_LOGITS`, `MLP_HEAD`
   - YAML loading helper using `pyyaml` + `dacite`
   - Device auto-detection: CUDA > MPS > CPU with appropriate dtype selection
-- [ ] Create 6 YAML config files in `configs/`:
+- [x] Create 6 YAML config files in `configs/`:
   - `emb_only_r16.yaml` — embedding specialist baseline
   - `rank_only_r16.yaml` — reranking specialist baseline
   - `joint_single_r16.yaml` — joint training (interference measurement)
@@ -95,8 +95,8 @@ Set up the Python project from scratch: dependency management via `uv`, director
 
 ## Acceptance Criteria
 
-- [ ] `uv sync` completes without errors
-- [ ] `uv run python -c "import torch; print(torch.cuda.is_available() or torch.backends.mps.is_available())"` prints `True`
-- [ ] `uv run python -c "from unimoe.config import ExperimentConfig, TrainingMode, ScoringMode"` imports without error
-- [ ] `tests/test_config.py` passes: loads each of the 6 YAML configs, verifies field types, defaults, round-trip serialization, and device auto-detection logic
-- [ ] `uv run pytest tests/test_config.py -v` all green
+- [x] `uv sync` completes without errors
+- [x] `uv run python -c "import torch; print(torch.cuda.is_available() or torch.backends.mps.is_available())"` prints `True`
+- [x] `uv run python -c "from unimoe.config import ExperimentConfig, TrainingMode, ScoringMode"` imports without error
+- [x] `tests/test_config.py` passes: loads each of the 6 YAML configs, verifies field types, defaults, round-trip serialization, and device auto-detection logic
+- [x] `uv run pytest tests/test_config.py -v` all green

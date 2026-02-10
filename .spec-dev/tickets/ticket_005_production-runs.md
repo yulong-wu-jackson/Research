@@ -2,7 +2,7 @@
 
 **Created:** 2026-02-06
 **Updated:** 2026-02-07
-**Status:** Draft
+**Status:** Complete
 **Depends on:** ticket_004 (evaluation and analysis pipeline must work end-to-end)
 **Blocks:** None (this is the final ticket; outcome determines project direction)
 
@@ -21,7 +21,7 @@ Implement the master experiment runner script and execute the full kill gate exp
 ## Requirements
 
 ### Experiment Runner (`scripts/run_experiment1.py`)
-- [ ] CLI: `--quick` (r=8, seed=42 only) vs default full tier (r=16, seeds=[42, 123, 456])
+- [x] CLI: `--quick` (r=8, seed=42 only) vs default full tier (r=16, seeds=[42, 123, 456])
   - `--device` flag (default: auto — CUDA > MPS > CPU)
   - Sequentially runs: train -> evaluate -> (next config/seed) -> ... -> analyze
   - Runs all 3 configs: `emb_only`, `rank_only`, `joint_single`

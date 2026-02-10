@@ -2,7 +2,7 @@
 
 **Created:** 2026-02-06
 **Updated:** 2026-02-07
-**Status:** Draft
+**Status:** Complete
 **Depends on:** ticket_003 (needs trained checkpoints to evaluate)
 **Blocks:** ticket_005 (production runs use eval + analysis)
 
@@ -22,22 +22,22 @@ Implement the full evaluation pipeline (reranking on BEIR/MS MARCO dev via yes/n
 ## Requirements
 
 ### Model Wrappers (`src/unimoe/evaluation/model_wrappers.py`)
-- [ ] `MTEBEncoderWrapper`: wraps `UnimodelForExp1` to implement MTEB v2 `EncoderProtocol`:
+- [x] `MTEBEncoderWrapper`: wraps `UnimodelForExp1` to implement MTEB v2 `EncoderProtocol`:
   ```python
   def encode(self, inputs: DataLoader[BatchedInput], *, task_metadata, ...) -> Array
   ```
   Uses model's `encode()` method (last-token pooling + L2 norm). Handles instruction prefix for queries based on `prompt_type`.
-- [ ] `MTEBCrossEncoderWrapper`: wraps `UnimodelForExp1` to implement MTEB v2 `CrossEncoderProtocol`:
+- [x] `MTEBCrossEncoderWrapper`: wraps `UnimodelForExp1` to implement MTEB v2 `CrossEncoderProtocol`:
   ```python
   def predict(self, inputs1: DataLoader, inputs2: DataLoader, ...) -> Array
   ```
   Uses model's `rerank()` method (yes/no token logit scoring). Formats inputs using Qwen3-Reranker chat template.
 
 ### Reranking Evaluation (`src/unimoe/evaluation/reranking_eval.py`)
-- [ ] `evaluate_msmarco_dev(model, tokenizer, config)`: load MS MARCO dev queries (6,980) + qrels, use pre-computed BM25 top-100 candidates, rerank with model using yes/no scoring, compute MRR@10 via pytrec_eval
-- [ ] `evaluate_beir(model, tokenizer, config, dataset_name)`: download BEIR dataset, BM25 top-100 retrieval (via `rank_bm25` or beir's built-in), rerank with model, compute nDCG@10 via pytrec_eval
-- [ ] `evaluate_reranking_suite(model, tokenizer, config)`: run all configured BEIR datasets + MS MARCO dev, return aggregated results dict with per-dataset and average scores
-- [ ] Reranking scoring function matching Qwen3-Reranker inference exactly:
+- [x] `evaluate_msmarco_dev(model, tokenizer, config)`: load MS MARCO dev queries (6,980) + qrels, use pre-computed BM25 top-100 candidates, rerank with model using yes/no scoring, compute MRR@10 via pytrec_eval
+- [x] `evaluate_beir(model, tokenizer, config, dataset_name)`: download BEIR dataset, BM25 top-100 retrieval (via `rank_bm25` or beir's built-in), rerank with model, compute nDCG@10 via pytrec_eval
+- [x] `evaluate_reranking_suite(model, tokenizer, config)`: run all configured BEIR datasets + MS MARCO dev, return aggregated results dict with per-dataset and average scores
+- [x] Reranking scoring function matching Qwen3-Reranker inference exactly:
   ```python
   logits = model(**inputs).logits[:, -1, :]
   true_vector = logits[:, yes_token_id]
@@ -48,10 +48,10 @@ Implement the full evaluation pipeline (reranking on BEIR/MS MARCO dev via yes/n
   ```
 
 ### Embedding Evaluation (`src/unimoe/evaluation/embedding_eval.py`)
-- [ ] `evaluate_mteb(model, tokenizer, config)`: run MTEB(eng, v2) benchmark using the `MTEBEncoderWrapper`, save results to output directory. For fast tier, run only retrieval task subset (SciFact, NFCorpus, FiQA2018).
+- [x] `evaluate_mteb(model, tokenizer, config)`: run MTEB(eng, v2) benchmark using the `MTEBEncoderWrapper`, save results to output directory. For fast tier, run only retrieval task subset (SciFact, NFCorpus, FiQA2018).
 
 ### Evaluate Script (`scripts/evaluate.py`)
-- [ ] CLI: `--checkpoint <path>`, `--config <yaml>`, `--eval-tier <fast|full>`
+- [x] CLI: `--checkpoint <path>`, `--config <yaml>`, `--eval-tier <fast|full>`
   - Loads checkpoint (PEFT adapter)
   - Runs reranking eval (always, BM25 top-100 first stage)
   - Runs embedding eval (for EMB_ONLY and JOINT configs)
@@ -59,22 +59,22 @@ Implement the full evaluation pipeline (reranking on BEIR/MS MARCO dev via yes/n
   - JSON includes: per-query scores (for bootstrap significance testing), aggregate metrics, config snapshot
 
 ### Analysis (`src/unimoe/analysis/compare.py`, `scripts/analyze_results.py`)
-- [ ] `load_all_results(output_dir)`: scan output directories, load all result JSONs, return structured dict `{config_name: {seed: {dataset: {metric: value}}}}`
-- [ ] `compute_interference_metrics(results)`:
+- [x] `load_all_results(output_dir)`: scan output directories, load all result JSONs, return structured dict `{config_name: {seed: {dataset: {metric: value}}}}`
+- [x] `compute_interference_metrics(results)`:
   - Task Interference Ratio (TIR): `(Specialist_metric - Joint_metric) / Specialist_metric`
   - Compute TIR per seed for both tasks (reranking TIR using rank_only as specialist, embedding TIR using emb_only as specialist)
   - Report mean +/- std across seeds
   - Kill gate verdict: PASS (>= 2%), FAIL (< 1%), MARGINAL (1-2%)
   - Also report absolute score deltas alongside TIR
-- [ ] `compute_significance(results)`: paired bootstrap resampling (10,000 iterations) on per-query scores for key comparisons
-- [ ] `generate_comparison_table(results)`: produce markdown + LaTeX-ready table comparing all configs across all metrics. Format: bold best, underline second-best, subscript std.
-- [ ] `generate_plots(results, output_path)`:
+- [x] `compute_significance(results)`: paired bootstrap resampling (10,000 iterations) on per-query scores for key comparisons
+- [x] `generate_comparison_table(results)`: produce markdown + LaTeX-ready table comparing all configs across all metrics. Format: bold best, underline second-best, subscript std.
+- [x] `generate_plots(results, output_path)`:
   - Bar charts of per-dataset nDCG@10 for each config
   - Training loss curves (from JSONL logs)
   - Gradient conflict heatmap per layer (from gradient_conflicts.jsonl)
 
 ### Analyze Script (`scripts/analyze_results.py`)
-- [ ] CLI: `--output-dir <path>`
+- [x] CLI: `--output-dir <path>`
   - Loads all results, computes metrics, generates tables + plots
   - Prints kill gate verdict to stdout with clear formatting
   - Saves analysis report as markdown in `outputs/analysis/`
@@ -118,4 +118,4 @@ Implement the full evaluation pipeline (reranking on BEIR/MS MARCO dev via yes/n
 - [ ] Results saved as JSON files in correct output directory structure, including per-query scores
 - [ ] `scripts/analyze_results.py` loads results, computes TIR, prints verdict, generates table + at least one plot
 - [ ] Analysis works with partial results (e.g., only rank_only available, joint not yet run)
-- [ ] `uv run pytest tests/ -v` all green
+- [x] `uv run pytest tests/ -v` all green

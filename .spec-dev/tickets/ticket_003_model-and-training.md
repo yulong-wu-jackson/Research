@@ -2,7 +2,7 @@
 
 **Created:** 2026-02-06
 **Updated:** 2026-02-07
-**Status:** Draft
+**Status:** Complete
 **Depends on:** ticket_001 (config), ticket_002 (data pipeline)
 **Blocks:** ticket_004 (evaluation needs trained checkpoints)
 
@@ -22,7 +22,7 @@ Implement the core model (Qwen3-0.6B-Base + LoRA + dual task modes) and the trai
 ## Requirements
 
 ### Model (`src/unimoe/model/lora_model.py`)
-- [ ] `UnimodelForExp1` class wrapping Qwen3-0.6B-Base:
+- [x] `UnimodelForExp1` class wrapping Qwen3-0.6B-Base:
   - Load base model via `AutoModelForCausalLM`, freeze all base params
   - Apply LoRA via PEFT `LoraConfig`:
     - `target_modules`: `["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]`
@@ -44,15 +44,15 @@ Implement the core model (Qwen3-0.6B-Base + LoRA + dual task modes) and the trai
   - Access hidden states via `output_hidden_states=True` for future gradient analysis
 
 ### Losses (`src/unimoe/training/losses.py`)
-- [ ] `InfoNCELoss`: contrastive loss matching Qwen3-Embedding's improved InfoNCE (paper Equation 1):
+- [x] `InfoNCELoss`: contrastive loss matching Qwen3-Embedding's improved InfoNCE (paper Equation 1):
     - **Five-component denominator:** (1) positive pair, (2) explicit hard negatives, (3) in-batch query-query pairs, (4) in-batch document-document pairs, (5) in-batch cross-pair query-document
     - **False negative masking:** mask factor `m_ij = 0 if sim(q_i, d_j) > sim(q_i, d_i+) + 0.1`, preventing false negatives from dominating the loss
     - Configurable temperature (default tau=0.05, i.e., scale=20.0 — Qwen3 paper does not disclose tau; 0.05 is the sentence-transformers/Jina v3 standard)
     - Supports `CachedMultipleNegativesRankingLoss`-style gradient caching for large effective batch sizes (future enhancement)
-- [ ] `RerankingSFTLoss`: cross-entropy loss on yes/no token logits — negative log probability of the correct label token. Equivalent to BCE but aligned with Qwen3-Reranker's SFT approach.
+- [x] `RerankingSFTLoss`: cross-entropy loss on yes/no token logits — negative log probability of the correct label token. Equivalent to BCE but aligned with Qwen3-Reranker's SFT approach.
 
 ### Trainer (`src/unimoe/training/trainer.py`)
-- [ ] `UnifiedTrainer` class:
+- [x] `UnifiedTrainer` class:
   - Accepts config, model, optional embedding dataloader, optional reranking dataloader
   - Mode-aware step dispatch:
     - `RANK_ONLY`: every step uses reranking batch + SFT loss
@@ -68,7 +68,7 @@ Implement the core model (Qwen3-0.6B-Base + LoRA + dual task modes) and the trai
   - Optional wandb integration (disabled by default for sanity runs)
 
 ### Entry Script (`scripts/train.py`)
-- [ ] CLI: `--config <yaml>`, `--seed <int>`, `--device <auto|cuda|mps|cpu>`
+- [x] CLI: `--config <yaml>`, `--seed <int>`, `--device <auto|cuda|mps|cpu>`
   - Device auto-detection: CUDA > MPS > CPU
   - Loads config, sets seed (random, numpy, torch, cuda/mps), builds model, dataloaders, trainer
   - Saves frozen config copy to output directory for reproducibility
@@ -106,16 +106,16 @@ Implement the core model (Qwen3-0.6B-Base + LoRA + dual task modes) and the trai
 
 ## Acceptance Criteria
 
-- [ ] `tests/test_model.py` passes:
+- [x] `tests/test_model.py` passes:
   - Only LoRA params are trainable (base + LM head frozen)
   - `encode()` returns L2-normalized vectors of shape (B, 1024)
   - `rerank()` returns scalars of shape (B,) using yes/no logit difference
   - LoRA applied to all 7 module types (q/k/v/o/gate/up/down)
   - Trainable param count is ~15M
   - Forward pass completes on available device without error
-- [ ] `tests/test_losses.py` passes: correct loss values on known inputs for both InfoNCE (with hard negatives) and RerankingSFTLoss
-- [ ] `tests/test_training_step.py` passes: one training step completes, loss is finite, gradients flow only to trainable params
-- [ ] `tests/test_gradient_conflict.py` passes: gradient conflict computation returns valid cosine similarity values in [-1, 1] per layer
+- [x] `tests/test_losses.py` passes: correct loss values on known inputs for both InfoNCE (with hard negatives) and RerankingSFTLoss
+- [x] `tests/test_training_step.py` passes: one training step completes, loss is finite, gradients flow only to trainable params
+- [x] `tests/test_gradient_conflict.py` passes: gradient conflict computation returns valid cosine similarity values in [-1, 1] per layer
 - [ ] Sanity run: `uv run python scripts/train.py --config configs/rank_only_r8.yaml --seed 42` with 1000 samples, 1 epoch — loss decreases
 - [ ] Checkpoint saved to `outputs/rank_only_r8/seed_42/checkpoints/final/`
-- [ ] `uv run pytest tests/ -v` all green (including tests from prior tickets)
+- [x] `uv run pytest tests/ -v` all green (including tests from prior tickets)

@@ -1,0 +1,56 @@
+model:
+  base_model_name: "Qwen/Qwen3-0.6B-Base"
+  torch_dtype: "auto"
+  device: "auto"
+
+lora:
+  rank: 8
+  alpha: 8
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  bias: "none"
+
+data:
+  dataset_name: "sentence-transformers/msmarco"
+  embedding_samples: 10000
+  reranking_samples: 10000
+  query_max_len: 128
+  passage_max_len: 256
+  reranking_max_len: 512
+  num_hard_negatives: 7
+  instruction_prefix: "Given a web search query, retrieve relevant passages that answer the query"
+
+training:
+  mode: "rank_only"
+  lr: 1.0e-4
+  warmup_ratio: 0.05
+  epochs: 1
+  batch_size_embedding: 8
+  batch_size_reranking: 16
+  grad_accum_steps: 4
+  max_grad_norm: 1.0
+  optimizer: "adamw"
+  temperature: 0.05
+  reranking_loss_weight: 1.0
+  scoring_mode: "yes_no_logits"
+  gradient_conflict_every_n_steps: 100
+
+eval:
+  eval_tier: "fast"
+  beir_datasets:
+    - SciFact
+    - NFCorpus
+    - FiQA2018
+  eval_batch_size: 64
+
+seed: 42
+output_dir: "outputs/rank_only_r8"
+wandb_enabled: false
+experiment_name: "rank_only_r8"

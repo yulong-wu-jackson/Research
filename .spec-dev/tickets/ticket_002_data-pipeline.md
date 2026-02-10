@@ -2,7 +2,7 @@
 
 **Created:** 2026-02-06
 **Updated:** 2026-02-07
-**Status:** Draft
+**Status:** Complete
 **Depends on:** ticket_001 (config system, project structure)
 **Blocks:** ticket_003 (model+training needs data), ticket_004 (eval needs data)
 
@@ -21,23 +21,23 @@ Download and preprocess MS MARCO passage data into two task-specific formats (em
 
 ## Requirements
 
-- [ ] Implement `src/unimoe/data/msmarco.py`:
+- [x] Implement `src/unimoe/data/msmarco.py`:
   - Download `sentence-transformers/msmarco` subsets (corpus, queries, triplets, labeled-list) via HuggingFace `datasets`
   - Download `sentence-transformers/msmarco-hard-negatives` for pre-mined hard negatives
   - For embedding: resolve triplet IDs to text, use full ~500K queries, mine 7 hard negatives per query from pre-mined dataset (sample from ranks 30-100 to avoid false negatives), cache as Arrow/Parquet in `data/`
   - For reranking: flatten labeled-list, subsample 5-7 hard negatives per query (highest BM25-ranked but labeled 0), resolve IDs, cache ~500K pairs
   - Functions: `load_embedding_dataset(config)` and `load_reranking_dataset(config)` that return HuggingFace Dataset objects
   - Configurable `num_samples` parameter for quick sanity runs (default: full dataset)
-- [ ] Implement `src/unimoe/data/collators.py`:
+- [x] Implement `src/unimoe/data/collators.py`:
   - `EmbeddingCollator`: tokenizes query (with instruction prefix), positive, and hard negatives separately; appends EOS token; returns dict with `query_input_ids`, `query_attention_mask`, `pos_input_ids`, `pos_attention_mask`, `neg_input_ids` (list), `neg_attention_mask` (list)
   - `RerankingCollator`: formats input using Qwen3-Reranker chat template via **pre-tokenized prefix/suffix concatenation** (NOT full-string tokenization — BPE is context-sensitive at join boundaries). Pre-compute `prefix_token_ids` and `suffix_token_ids` once at init, tokenize only the user content (`<Instruct>...<Document>...`) per sample, then concatenate `prefix + content + suffix` at the token-ID level. Returns `input_ids`, `attention_mask`, `labels` (token ID for "yes" or "no")
   - Both use the Qwen3 tokenizer with appropriate max lengths from config
-- [ ] Implement `src/unimoe/data/templates.py`:
+- [x] Implement `src/unimoe/data/templates.py`:
   - `format_embedding_query(instruction, query)` -> `"Instruct: {instruction}\nQuery:{query}"` (Qwen3-Embedding format — NOTE: no space after `Query:`, matching official `config_sentence_transformers.json`)
   - `format_reranking_input(instruction, query, document)` -> full Qwen3-Reranker chat template string, including the `<think>\n\n</think>\n\n` suffix that Qwen3-Reranker expects before yes/no prediction
   - Default instruction: `"Given a web search query, retrieve relevant passages that answer the query"`
   - `set_tokenizer_config(tokenizer)` -> set `padding_side='left'` for causal attention / flash_attention_2 compatibility (matches Qwen3-Embedding)
-- [ ] Implement `scripts/download_data.py`: CLI entry point that triggers download + preprocessing, reports dataset sizes and label distributions
+- [x] Implement `scripts/download_data.py`: CLI entry point that triggers download + preprocessing, reports dataset sizes and label distributions
 
 ## Design Decisions
 
@@ -88,7 +88,7 @@ Download and preprocess MS MARCO passage data into two task-specific formats (em
 - [ ] Embedding dataset has ~500K rows with text columns including 7 hard negatives per query
 - [ ] Reranking dataset has ~500K rows with Qwen3-Reranker chat template format and yes/no labels
 - [ ] Label distribution is documented (pos:neg ratio ~1:5-7 for reranking)
-- [ ] `tests/test_data.py` passes: verifies batch shapes, token ID ranges, attention mask values, label values (yes/no token IDs), sequence length constraints, instruction prefix presence, EOS token appended
-- [ ] A DataLoader with each collator produces correctly-shaped batches without errors
-- [ ] Chat template output matches Qwen3-Reranker expected format
-- [ ] `uv run pytest tests/test_data.py -v` all green
+- [x] `tests/test_data.py` passes: verifies batch shapes, token ID ranges, attention mask values, label values (yes/no token IDs), sequence length constraints, instruction prefix presence, EOS token appended
+- [x] A DataLoader with each collator produces correctly-shaped batches without errors
+- [x] Chat template output matches Qwen3-Reranker expected format
+- [x] `uv run pytest tests/test_data.py -v` all green
