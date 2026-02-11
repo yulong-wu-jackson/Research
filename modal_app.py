@@ -242,6 +242,9 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
                 shuffle=True,
                 collate_fn=emb_collator,
                 drop_last=True,
+                num_workers=4,
+                persistent_workers=True,
+                generator=torch.Generator().manual_seed(seed),
             )
 
         if config.training.mode in (TrainingMode.RANK_ONLY, TrainingMode.JOINT_SINGLE):
@@ -253,6 +256,9 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
                 shuffle=True,
                 collate_fn=rerank_collator,
                 drop_last=True,
+                num_workers=4,
+                persistent_workers=True,
+                generator=torch.Generator().manual_seed(seed + 1),
             )
 
         save_config(config, str(output_dir / "config.yaml"))

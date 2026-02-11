@@ -71,6 +71,17 @@ class UnimodelForExp1(nn.Module):
         self.yes_token_id = tokenizer.convert_tokens_to_ids("yes")
         self.no_token_id = tokenizer.convert_tokens_to_ids("no")
 
+        if self.yes_token_id is None or self.no_token_id is None:
+            raise ValueError(
+                "Tokenizer does not contain 'yes' or 'no' as single tokens. "
+                f"Got yes_id={self.yes_token_id}, no_id={self.no_token_id}"
+            )
+        unk_id = getattr(tokenizer, "unk_token_id", None)
+        if unk_id is not None and (self.yes_token_id == unk_id or self.no_token_id == unk_id):
+            raise ValueError(
+                "'yes' or 'no' resolved to the unknown token — tokenizer mismatch"
+            )
+
         # EOS token for pooling: use pad_token_id (151643, <|endoftext|>)
         # NOT eos_token_id which is 151645 (<|im_end|>) in some configs
         self.pool_token_id = tokenizer.pad_token_id

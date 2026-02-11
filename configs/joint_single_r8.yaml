@@ -38,7 +38,7 @@ training:
   max_grad_norm: 1.0
   optimizer: "adamw"
   temperature: 0.05
-  reranking_loss_weight: 5.0
+  reranking_loss_weight: 1.0
   scoring_mode: "yes_no_logits"
   gradient_conflict_every_n_steps: 100
 

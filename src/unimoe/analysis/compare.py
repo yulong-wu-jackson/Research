@@ -284,16 +284,26 @@ def _get_per_task_embedding_scores(seed_results: dict) -> dict | None:
 def _bootstrap_test(
     scores_a: np.ndarray, scores_b: np.ndarray, n_iter: int = 10000
 ) -> float:
-    """Paired bootstrap resampling test."""
+    """Paired permutation test for H0: no difference between A and B.
+
+    For each iteration, randomly flips the sign of each paired difference
+    (equivalent to swapping A/B labels per query), then checks how often
+    the permuted mean difference is as extreme as observed.  This correctly
+    controls the Type-I error rate under the null hypothesis.
+
+    Returns one-sided p-value: probability that A is at least as much
+    better than B as observed, under H0.
+    """
     rng = np.random.default_rng(42)
     n = len(scores_a)
-    observed_diff = np.mean(scores_a) - np.mean(scores_b)
+    diffs = scores_a - scores_b
+    observed_diff = np.mean(diffs)
 
     count = 0
     for _ in range(n_iter):
-        indices = rng.choice(n, size=n, replace=True)
-        diff = np.mean(scores_a[indices]) - np.mean(scores_b[indices])
-        if diff <= 0:
+        signs = rng.choice([-1, 1], size=n)
+        perm_diff = np.mean(diffs * signs)
+        if perm_diff >= observed_diff:
             count += 1
 
     return count / n_iter
@@ -406,6 +416,8 @@ def _plot_loss_curves(base_dir: Path, save_path: Path) -> None:
             with open(log_path) as f:
                 for line in f:
                     entry = json.loads(line)
+                    if "step" not in entry or "loss" not in entry:
+                        continue  # skip epoch summaries
                     steps.append(entry["step"])
                     losses.append(entry["loss"])
 

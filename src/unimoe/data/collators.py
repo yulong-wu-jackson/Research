@@ -28,6 +28,12 @@ class EmbeddingCollator:
     """
 
     def __init__(self, tokenizer: PreTrainedTokenizer, config: DataConfig):
+        if tokenizer.padding_side != "left":
+            raise ValueError(
+                f"EmbeddingCollator requires left-padding for last-token pooling, "
+                f"got padding_side='{tokenizer.padding_side}'. "
+                f"Call set_tokenizer_config(tokenizer) first."
+            )
         self.tokenizer = tokenizer
         self.query_max_len = config.query_max_len
         self.passage_max_len = config.passage_max_len
@@ -101,6 +107,12 @@ class RerankingCollator:
     """
 
     def __init__(self, tokenizer: PreTrainedTokenizer, config: DataConfig):
+        if tokenizer.padding_side != "left":
+            raise ValueError(
+                f"RerankingCollator requires left-padding for causal attention, "
+                f"got padding_side='{tokenizer.padding_side}'. "
+                f"Call set_tokenizer_config(tokenizer) first."
+            )
         self.tokenizer = tokenizer
         self.max_len = config.reranking_max_len
         self.instruction = config.instruction_prefix

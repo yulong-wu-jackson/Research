@@ -104,12 +104,18 @@ def load_embedding_dataset(
             continue
         positive_text = corpus_lookup[pos_id_str]
 
+        # Positive IDs to exclude from negatives (avoid false negatives)
+        pos_id_set = {str(pid) for pid in pos_ids}
+
         # Get BM25 hard negatives, sampling from ranks 30-100 to avoid false negatives
         neg_dict = info["neg"]
         bm25_negs = neg_dict.get("bm25", [])
 
         # Sample from ranks 30-100 (index 29-99) to avoid false negatives
-        candidate_negs = bm25_negs[29:100] if len(bm25_negs) >= 30 else bm25_negs
+        candidate_negs = [
+            nid for nid in (bm25_negs[29:100] if len(bm25_negs) >= 30 else bm25_negs)
+            if str(nid) not in pos_id_set
+        ]
         if not candidate_negs:
             continue
 
@@ -118,7 +124,11 @@ def load_embedding_dataset(
             if retriever in neg_dict:
                 dense_negs = neg_dict[retriever]
                 if isinstance(dense_negs, list) and dense_negs:
-                    candidate_negs.extend(dense_negs[29:100] if len(dense_negs) >= 30 else dense_negs)
+                    filtered = [
+                        nid for nid in (dense_negs[29:100] if len(dense_negs) >= 30 else dense_negs)
+                        if str(nid) not in pos_id_set
+                    ]
+                    candidate_negs.extend(filtered)
 
         # Sample K negatives and resolve to text
         if len(candidate_negs) < num_hard_negs:
@@ -193,6 +203,9 @@ def load_reranking_dataset(
     max_neg_per_query = 7
     min_neg_per_query = 5
 
+    # Seed for reproducible negative sampling across seeds
+    random.seed(seed)
+
     for row in tqdm(labeled_ds, desc="Building reranking dataset"):
         qid_str = str(row["query_id"])
         if qid_str not in query_lookup:
@@ -224,12 +237,13 @@ def load_reranking_dataset(
                 "label": "yes",
             })
 
-        # Subsample negatives (5-7 per query, highest BM25-ranked first)
+        # Subsample negatives (5-7 per query, randomly sampled)
         num_negs = min(max_neg_per_query, len(negatives))
         if num_negs < min_neg_per_query and len(negatives) >= min_neg_per_query:
             num_negs = min_neg_per_query
 
-        for neg_text in negatives[:num_negs]:
+        sampled_negs = random.sample(negatives, num_negs) if len(negatives) > num_negs else negatives[:num_negs]
+        for neg_text in sampled_negs:
             records.append({
                 "query": query_text,
                 "document": neg_text,
