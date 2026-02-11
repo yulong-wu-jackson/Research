@@ -50,5 +50,5 @@ eval:
 
 seed: 42
 output_dir: "outputs/joint_single_r16"
-wandb_enabled: false
+wandb_enabled: true
 experiment_name: "joint_single_r16"

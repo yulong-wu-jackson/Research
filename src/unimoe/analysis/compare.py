@@ -203,19 +203,82 @@ def compute_significance(results: dict) -> dict:
                 "n_queries": len(common_qids),
             }
 
+    # Embedding significance: emb_only vs joint (task-level paired test)
+    emb_only = None
+    for config_name in results:
+        if "emb_only" in config_name:
+            emb_only = config_name
+
+    if emb_only and joint:
+        # Collect per-task scores across seeds for paired comparison.
+        # Each (seed, task) pair is one observation.
+        all_specialist: list[float] = []
+        all_joint: list[float] = []
+
+        for seed in results.get(joint, {}):
+            if seed not in results.get(emb_only, {}):
+                continue
+
+            specialist_ts = _get_per_task_embedding_scores(results[emb_only][seed])
+            joint_ts = _get_per_task_embedding_scores(results[joint][seed])
+
+            if specialist_ts and joint_ts:
+                common_tasks = set(specialist_ts.keys()) & set(joint_ts.keys())
+                for task in common_tasks:
+                    all_specialist.append(specialist_ts[task])
+                    all_joint.append(joint_ts[task])
+
+        if len(all_specialist) >= 3:
+            s_scores = np.array(all_specialist)
+            j_scores = np.array(all_joint)
+
+            p_value = _bootstrap_test(s_scores, j_scores, n_iter=10000)
+            significance["embedding_overall"] = {
+                "p_value": p_value,
+                "significant": p_value < 0.05,
+                "n_observations": len(all_specialist),
+                "test_type": "paired_bootstrap",
+                "note": "Each observation is a (seed, task) pair",
+            }
+
     return significance
 
 
 def _get_per_query_scores(seed_results: dict) -> dict | None:
-    """Extract per-query nDCG@10 scores from reranking results."""
+    """Extract per-query nDCG@10 scores from reranking results.
+
+    Query IDs are prefixed with the dataset name to avoid collisions
+    between datasets that use overlapping ID schemes (e.g. SciFact
+    and FiQA2018 both use small integers).
+    """
     reranking = seed_results.get("reranking", {})
     per_dataset = reranking.get("per_dataset", {})
-    # Merge per-query scores from all datasets
     all_pq = {}
-    for dataset_results in per_dataset.values():
+    for dataset_name, dataset_results in per_dataset.items():
         pq = dataset_results.get("per_query", {})
-        all_pq.update(pq)
+        for qid, score in pq.items():
+            all_pq[f"{dataset_name}_{qid}"] = score
     return all_pq if all_pq else None
+
+
+def _get_per_task_embedding_scores(seed_results: dict) -> dict | None:
+    """Extract per-task nDCG@10 scores from MTEB results.
+
+    Returns dict mapping task_name -> ndcg_at_10 score.
+    Used for embedding significance testing at the task level.
+    """
+    mteb = seed_results.get("mteb", {})
+    per_task = mteb.get("per_task", {})
+    if not per_task:
+        return None
+    scores = {}
+    for task_name, task_data in per_task.items():
+        if isinstance(task_data, dict):
+            for key in ["ndcg_at_10", "main_score", "ndcg@10"]:
+                if key in task_data:
+                    scores[task_name] = task_data[key]
+                    break
+    return scores if scores else None
 
 
 def _bootstrap_test(

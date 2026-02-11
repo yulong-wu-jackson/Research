@@ -310,6 +310,35 @@ class TestRerankingCollator:
         assert collator.no_token_id > 0
 
 
+class TestTokenizationConsistency:
+    """Verify that training and eval produce identical token IDs."""
+
+    def test_collator_matches_shared_utility(self, tokenizer, data_config):
+        """Training collator and shared utility should produce identical token IDs."""
+        from unimoe.data.templates import build_reranking_token_ids
+
+        collator = RerankingCollator(tokenizer, data_config)
+        query = "What is machine learning?"
+        document = "ML is a subset of AI that learns from data."
+
+        # Training path (collator)
+        collator_ids = collator._build_input(query, document)
+
+        # Eval path (shared utility)
+        eval_ids = build_reranking_token_ids(
+            tokenizer,
+            data_config.instruction_prefix,
+            query,
+            document,
+            data_config.reranking_max_len,
+        )
+
+        assert collator_ids == eval_ids, (
+            f"Token ID mismatch: collator produced {len(collator_ids)} tokens, "
+            f"eval produced {len(eval_ids)} tokens"
+        )
+
+
 class TestDataLoaderIntegration:
     """Test that collators work with PyTorch DataLoader."""
 

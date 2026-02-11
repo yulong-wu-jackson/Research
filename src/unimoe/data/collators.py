@@ -14,8 +14,7 @@ from transformers import PreTrainedTokenizer
 
 from unimoe.config import DataConfig
 from unimoe.data.templates import (
-    DEFAULT_INSTRUCTION,
-    RERANKING_SYSTEM_PROMPT,
+    build_reranking_token_ids,
     format_embedding_query,
 )
 
@@ -104,45 +103,17 @@ class RerankingCollator:
     def __init__(self, tokenizer: PreTrainedTokenizer, config: DataConfig):
         self.tokenizer = tokenizer
         self.max_len = config.reranking_max_len
+        self.instruction = config.instruction_prefix
 
         # Resolve yes/no token IDs
         self.yes_token_id = tokenizer.convert_tokens_to_ids("yes")
         self.no_token_id = tokenizer.convert_tokens_to_ids("no")
 
-        # Pre-tokenize prefix and suffix (no special tokens added)
-        prefix_text = (
-            f"<|im_start|>system\n"
-            f"{RERANKING_SYSTEM_PROMPT}<|im_end|>\n"
-            f"<|im_start|>user\n"
-        )
-        suffix_text = (
-            f"<|im_end|>\n"
-            f"<|im_start|>assistant\n"
-            f"<think>\n\n</think>\n\n"
-        )
-
-        self.prefix_ids = tokenizer.encode(prefix_text, add_special_tokens=False)
-        self.suffix_ids = tokenizer.encode(suffix_text, add_special_tokens=False)
-        self.instruction = config.instruction_prefix
-
     def _build_input(self, query: str, document: str) -> list[int]:
         """Build token IDs for a single query-document pair via concatenation."""
-        user_content = (
-            f"<Instruct>: {self.instruction}\n\n"
-            f"<Query>: {query}\n\n"
-            f"<Document>: {document}"
+        return build_reranking_token_ids(
+            self.tokenizer, self.instruction, query, document, self.max_len
         )
-        content_ids = self.tokenizer.encode(user_content, add_special_tokens=False)
-
-        full_ids = self.prefix_ids + content_ids + self.suffix_ids
-
-        # Truncate from content if needed (keep prefix + suffix intact)
-        max_content_len = self.max_len - len(self.prefix_ids) - len(self.suffix_ids)
-        if len(content_ids) > max_content_len:
-            content_ids = content_ids[:max_content_len]
-            full_ids = self.prefix_ids + content_ids + self.suffix_ids
-
-        return full_ids
 
     def __call__(self, batch: list[dict]) -> dict[str, torch.Tensor]:
         all_ids = []

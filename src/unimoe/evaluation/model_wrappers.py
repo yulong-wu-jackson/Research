@@ -14,8 +14,8 @@ from torch.utils.data import DataLoader
 
 from unimoe.data.templates import (
     DEFAULT_INSTRUCTION,
+    build_reranking_token_ids,
     format_embedding_query,
-    format_reranking_input,
 )
 from unimoe.model.lora_model import UnimodelForExp1
 
@@ -166,6 +166,8 @@ class MTEBCrossEncoderWrapper:
         """
         all_scores = []
         self.model.eval()
+        pad_id = self.tokenizer.pad_token_id
+        max_len = 512
 
         with torch.no_grad():
             for batch1, batch2 in zip(inputs1, inputs2):
@@ -176,23 +178,28 @@ class MTEBCrossEncoderWrapper:
                 if isinstance(documents, str):
                     documents = [documents]
 
-                # Format using Qwen3-Reranker chat template
-                formatted = [
-                    format_reranking_input(DEFAULT_INSTRUCTION, q, d)
+                # Build token IDs via concatenation (matching training collator)
+                all_ids = [
+                    build_reranking_token_ids(
+                        self.tokenizer, DEFAULT_INSTRUCTION, q, d, max_len
+                    )
                     for q, d in zip(queries, documents)
                 ]
 
-                encoded = self.tokenizer(
-                    formatted,
-                    padding=True,
-                    truncation=True,
-                    max_length=512,
-                    return_tensors="pt",
-                ).to(self.device)
+                # Left-pad to max length in batch
+                max_seq_len = min(max(len(ids) for ids in all_ids), max_len)
+                input_ids = []
+                attention_masks = []
+                for ids in all_ids:
+                    ids = ids[:max_seq_len]
+                    pad_len = max_seq_len - len(ids)
+                    input_ids.append([pad_id] * pad_len + ids)
+                    attention_masks.append([0] * pad_len + [1] * len(ids))
 
-                scores = self.model.rerank(
-                    encoded["input_ids"], encoded["attention_mask"]
-                )
+                input_ids_t = torch.tensor(input_ids, dtype=torch.long).to(self.device)
+                attention_mask_t = torch.tensor(attention_masks, dtype=torch.long).to(self.device)
+
+                scores = self.model.rerank(input_ids_t, attention_mask_t)
                 all_scores.append(scores.cpu().numpy())
 
         return np.concatenate(all_scores, axis=0)

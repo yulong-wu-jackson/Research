@@ -14,7 +14,7 @@ import torch
 from tqdm import tqdm
 
 from unimoe.config import ExperimentConfig
-from unimoe.data.templates import DEFAULT_INSTRUCTION, format_reranking_input
+from unimoe.data.templates import DEFAULT_INSTRUCTION, build_reranking_token_ids
 from unimoe.model.lora_model import UnimodelForExp1
 
 
@@ -27,29 +27,42 @@ def _score_pairs(
     max_len: int = 512,
     device: str = "cpu",
 ) -> list[float]:
-    """Score query-document pairs using yes/no logit scoring."""
+    """Score query-document pairs using yes/no logit scoring.
+
+    Uses token-ID concatenation (matching the training collator) to avoid
+    BPE boundary mismatches between training and evaluation.
+    """
     all_scores = []
     model.eval()
+    pad_id = tokenizer.pad_token_id
 
     with torch.no_grad():
         for i in range(0, len(queries), batch_size):
             batch_q = queries[i : i + batch_size]
             batch_d = documents[i : i + batch_size]
 
-            formatted = [
-                format_reranking_input(DEFAULT_INSTRUCTION, q, d)
+            # Build token IDs via concatenation (same as training collator)
+            all_ids = [
+                build_reranking_token_ids(
+                    tokenizer, DEFAULT_INSTRUCTION, q, d, max_len
+                )
                 for q, d in zip(batch_q, batch_d)
             ]
 
-            encoded = tokenizer(
-                formatted,
-                padding=True,
-                truncation=True,
-                max_length=max_len,
-                return_tensors="pt",
-            ).to(device)
+            # Left-pad to max length in batch
+            max_seq_len = min(max(len(ids) for ids in all_ids), max_len)
+            input_ids = []
+            attention_masks = []
+            for ids in all_ids:
+                ids = ids[:max_seq_len]
+                pad_len = max_seq_len - len(ids)
+                input_ids.append([pad_id] * pad_len + ids)
+                attention_masks.append([0] * pad_len + [1] * len(ids))
 
-            scores = model.rerank(encoded["input_ids"], encoded["attention_mask"])
+            input_ids_t = torch.tensor(input_ids, dtype=torch.long).to(device)
+            attention_mask_t = torch.tensor(attention_masks, dtype=torch.long).to(device)
+
+            scores = model.rerank(input_ids_t, attention_mask_t)
             all_scores.extend(scores.cpu().tolist())
 
     return all_scores
@@ -245,7 +258,12 @@ def evaluate_reranking_suite(
     tokenizer,
     config: ExperimentConfig,
 ) -> dict:
-    """Run reranking evaluation on all configured BEIR datasets + MS MARCO dev.
+    """Run reranking evaluation on all configured BEIR datasets.
+
+    Evaluates BM25-rerank nDCG@10 on each BEIR dataset specified in
+    ``config.eval.beir_datasets``.  MS MARCO dev evaluation is available
+    separately via :func:`evaluate_msmarco_dev` but is not included here
+    because the kill-gate experiment uses BEIR nDCG@10 as its primary metric.
 
     Returns aggregated results dict with per-dataset and average scores.
     """

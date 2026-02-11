@@ -54,7 +54,7 @@ def load_embedding_dataset(
     Returns:
         HuggingFace Dataset with columns: query, positive, negatives (list of str).
     """
-    cache_path = Path(cache_dir) / f"embedding_dataset_seed_{seed}"
+    cache_path = Path(cache_dir) / f"embedding_dataset_seed_{seed}_n{config.embedding_samples}_neg{config.num_hard_negatives}"
     if cache_path.exists():
         return Dataset.load_from_disk(str(cache_path))
 
@@ -175,7 +175,7 @@ def load_reranking_dataset(
     Returns:
         HuggingFace Dataset with columns: query, document, label ("yes"/"no").
     """
-    cache_path = Path(cache_dir) / f"reranking_dataset_seed_{seed}"
+    cache_path = Path(cache_dir) / f"reranking_dataset_seed_{seed}_n{config.reranking_samples}"
     if cache_path.exists():
         return Dataset.load_from_disk(str(cache_path))
 

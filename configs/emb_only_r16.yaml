@@ -50,5 +50,5 @@ eval:
 
 seed: 42
 output_dir: "outputs/emb_only_r16"
-wandb_enabled: false
+wandb_enabled: true
 experiment_name: "emb_only_r16"

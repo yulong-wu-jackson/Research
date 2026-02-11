@@ -210,3 +210,66 @@ class TestAnalysisCompare:
         assert metrics["verdict"] == "INCOMPLETE"
         table = generate_comparison_table(results)
         assert "rank_only_r8" in table
+
+    def test_query_id_collision_prevention(self, tmp_path):
+        """Query IDs from different datasets should not overwrite each other."""
+        # Create mock data where SciFact and FiQA2018 share query IDs (both integers)
+        shared_pq = {str(i): 0.5 + i * 0.01 for i in range(20)}
+
+        for config_name in ["rank_only_r8", "joint_single_r8"]:
+            rd = tmp_path / config_name / "seed_42" / "results"
+            rd.mkdir(parents=True)
+            with open(rd / "reranking_results.json", "w") as f:
+                json.dump({
+                    "per_dataset": {
+                        "SciFact": {
+                            "aggregate": {"ndcg@10": 0.6},
+                            "per_query": shared_pq,
+                        },
+                        "FiQA2018": {
+                            "aggregate": {"ndcg@10": 0.55},
+                            "per_query": shared_pq,
+                        },
+                    },
+                    "average": {"ndcg@10": 0.575},
+                }, f)
+
+        results = load_all_results(str(tmp_path))
+        sig = compute_significance(results)
+
+        # With proper prefixing, we should have 40 queries (20 per dataset)
+        for key, val in sig.items():
+            if "reranking" in key:
+                assert val["n_queries"] == 40, (
+                    f"Expected 40 queries (20 per dataset), got {val['n_queries']}"
+                )
+
+    def test_embedding_significance_computed(self, tmp_path):
+        """Significance should include embedding comparison when data is available."""
+        for config_name in ["emb_only_r8", "joint_single_r8"]:
+            for seed in [42, 123, 456]:
+                rd = tmp_path / config_name / f"seed_{seed}" / "results"
+                rd.mkdir(parents=True)
+                with open(rd / "reranking_results.json", "w") as f:
+                    json.dump({"per_dataset": {}, "average": {"ndcg@10": 0.5}}, f)
+                with open(rd / "mteb_results.json", "w") as f:
+                    json.dump({
+                        "per_task": {
+                            "SciFact": {"ndcg_at_10": 0.6 + seed * 0.001},
+                            "NFCorpus": {"ndcg_at_10": 0.55 + seed * 0.001},
+                            "FiQA2018": {"ndcg_at_10": 0.5 + seed * 0.001},
+                        },
+                        "eval_tier": "fast",
+                    }, f)
+
+        # Also add rank_only for completeness (avoids early return)
+        for seed in [42, 123, 456]:
+            rd = tmp_path / "rank_only_r8" / f"seed_{seed}" / "results"
+            rd.mkdir(parents=True)
+            with open(rd / "reranking_results.json", "w") as f:
+                json.dump({"per_dataset": {}, "average": {"ndcg@10": 0.55}}, f)
+
+        results = load_all_results(str(tmp_path))
+        sig = compute_significance(results)
+        assert "embedding_overall" in sig
+        assert sig["embedding_overall"]["n_observations"] == 9  # 3 seeds x 3 tasks

@@ -88,6 +88,73 @@ class TestEmbeddingTrainingStep:
         model.zero_grad()
 
 
+class TestTaskSchedule:
+    """Verify proportional task scheduling for joint training."""
+
+    def _make_trainer_with_loaders(self, model, emb_len, rerank_len):
+        """Create a trainer with mock dataloaders of given lengths."""
+        from unittest.mock import MagicMock
+
+        joint_config = ExperimentConfig(
+            model=ModelConfig(
+                base_model_name="Qwen/Qwen3-0.6B-Base",
+                torch_dtype="float32",
+                device="cpu",
+            ),
+            lora=LoRAConfig(rank=4, alpha=4, dropout=0.0),
+            training=TrainingConfig(mode=TrainingMode.JOINT_SINGLE),
+        )
+
+        emb_loader = MagicMock()
+        emb_loader.__len__ = MagicMock(return_value=emb_len)
+        rerank_loader = MagicMock()
+        rerank_loader.__len__ = MagicMock(return_value=rerank_len)
+
+        from unimoe.training.trainer import UnifiedTrainer
+
+        trainer = UnifiedTrainer(
+            config=joint_config,
+            model=model,
+            emb_dataloader=emb_loader,
+            rerank_dataloader=rerank_loader,
+        )
+        return trainer
+
+    def test_equal_lengths(self, model):
+        trainer = self._make_trainer_with_loaders(model, 100, 100)
+        schedule = trainer._build_task_schedule(200)
+        assert schedule.count("embedding") == 100
+        assert schedule.count("reranking") == 100
+
+    def test_2_to_1_ratio(self, model):
+        """emb_len=1250, rerank_len=625 (matches r8 config batch sizes)."""
+        trainer = self._make_trainer_with_loaders(model, 1250, 625)
+        schedule = trainer._build_task_schedule(1875)
+        assert schedule.count("embedding") == 1250
+        assert schedule.count("reranking") == 625
+
+    def test_10_to_1_ratio(self, model):
+        trainer = self._make_trainer_with_loaders(model, 1000, 100)
+        schedule = trainer._build_task_schedule(1100)
+        assert schedule.count("embedding") == 1000
+        assert schedule.count("reranking") == 100
+
+    def test_interleaving(self, model):
+        """Tasks should be interleaved, not all-emb then all-rerank."""
+        trainer = self._make_trainer_with_loaders(model, 100, 100)
+        schedule = trainer._build_task_schedule(200)
+        # Check first 4 steps alternate
+        assert schedule[0] == "embedding"
+        assert schedule[1] == "reranking"
+        assert schedule[2] == "embedding"
+        assert schedule[3] == "reranking"
+
+    def test_steps_in_epoch_sum(self, model):
+        """_steps_in_epoch should return sum of both loader lengths."""
+        trainer = self._make_trainer_with_loaders(model, 1250, 625)
+        assert trainer._steps_in_epoch() == 1875
+
+
 class TestRerankingTrainingStep:
     def test_one_step_completes(self, model, tokenizer):
         loss_fn = RerankingSFTLoss(
