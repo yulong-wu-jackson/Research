@@ -76,9 +76,9 @@ image = (
         # Tracking
         "wandb>=0.19.0",
     )
+    .env({"PYTHONPATH": "/root/src", "HF_HOME": "/vol/hf_cache"})
     .add_local_dir("src", remote_path="/root/src")
     .add_local_dir("configs", remote_path="/root/configs")
-    .env({"PYTHONPATH": "/root/src", "HF_HOME": "/vol/hf_cache"})
 )
 
 
