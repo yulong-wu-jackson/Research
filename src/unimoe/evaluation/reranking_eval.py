@@ -6,6 +6,8 @@ then computes nDCG@10 and MRR@10 via pytrec_eval.
 
 from __future__ import annotations
 
+import gc
+
 import numpy as np
 import pytrec_eval
 import torch
@@ -100,6 +102,11 @@ def evaluate_msmarco_dev(
 
         # Limit to top-100 candidates
         candidates[qid] = candidates[qid][:100]
+
+    # Release corpus_lookup (~8.8M entries) and raw datasets; only
+    # query_lookup is still needed for the reranking loop below.
+    del corpus_lookup, corpus_ds, queries_ds, labeled_ds
+    gc.collect()
 
     # Rerank candidates for each query
     run = {}
@@ -203,6 +210,12 @@ def evaluate_beir(
         )
 
         run[qid] = {cid: float(s) for cid, s in zip(candidate_ids, scores)}
+
+    # Release BM25 index, corpus structures, and query dict.  These can
+    # be 500 MB–2 GB for large BEIR datasets, and evaluate_reranking_suite
+    # calls this function multiple times sequentially.
+    del bm25, tokenized_corpus, corpus_ids, corpus_texts, corpus, queries
+    gc.collect()
 
     # Compute nDCG@10 via pytrec_eval
     qrels_int = {
