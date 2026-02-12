@@ -110,6 +110,24 @@ class MTEBEncoderWrapper:
 
         return np.concatenate(all_embeddings, axis=0)
 
+    def similarity(self, embeddings1: np.ndarray, embeddings2: np.ndarray) -> np.ndarray:
+        """Cosine similarity between two sets of embeddings."""
+        import torch as _torch
+
+        e1 = _torch.from_numpy(embeddings1)
+        e2 = _torch.from_numpy(embeddings2)
+        return _torch.nn.functional.cosine_similarity(
+            e1.unsqueeze(1), e2.unsqueeze(0), dim=2
+        ).numpy()
+
+    def similarity_pairwise(self, embeddings1: np.ndarray, embeddings2: np.ndarray) -> np.ndarray:
+        """Pairwise cosine similarity between corresponding embeddings."""
+        import torch as _torch
+
+        e1 = _torch.from_numpy(embeddings1)
+        e2 = _torch.from_numpy(embeddings2)
+        return _torch.nn.functional.cosine_similarity(e1, e2, dim=1).numpy()
+
 
 class MTEBCrossEncoderWrapper:
     """MTEB v2 CrossEncoderProtocol wrapper for UnimodelForExp1.
