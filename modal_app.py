@@ -91,6 +91,15 @@ def _config_path(yaml_name: str) -> str:
     return f"/root/configs/{yaml_name}"
 
 
+def _reload_volume():
+    """Reload the Modal volume, stepping out of /vol to avoid open-file errors."""
+    import os
+    cwd = os.getcwd()
+    os.chdir("/tmp")
+    vol.reload()
+    os.chdir(cwd)
+
+
 # ---------------------------------------------------------------------------
 # Step 1: Data preparation  (CPU, 32 GB RAM)
 # ---------------------------------------------------------------------------
@@ -180,7 +189,7 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
     import torch
 
     os.chdir(VOLUME_PATH)
-    vol.reload()
+    _reload_volume()
 
     config_path = _config_path(config_name)
 
@@ -289,7 +298,7 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
     # ------------------------------------------------------------------
     # Evaluation
     # ------------------------------------------------------------------
-    vol.reload()
+    _reload_volume()
 
     if (results_dir / "reranking_results.json").exists():
         print(f"[eval] Results exist for {run_label}, skipping evaluation.")
@@ -364,7 +373,7 @@ def analyze() -> str:
     import os
 
     os.chdir(VOLUME_PATH)
-    vol.reload()
+    _reload_volume()
 
     from pathlib import Path
 
