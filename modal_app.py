@@ -320,54 +320,67 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
     # Evaluation (same container — no vol.reload() needed, files are local)
     # ------------------------------------------------------------------
 
-    if (results_dir / "reranking_results.json").exists():
-        print(f"[eval] Results exist for {run_label}, skipping evaluation.")
-    elif not checkpoint_dir.exists():
+    if not checkpoint_dir.exists():
         print(f"[eval] No checkpoint for {run_label}, skipping evaluation.")
     else:
-        print(f"[eval] Starting evaluation for {run_label} ...")
         import json
 
         from transformers import AutoTokenizer
 
         from unimoe.config import TrainingMode
         from unimoe.data.templates import set_tokenizer_config
-        from unimoe.evaluation.reranking_eval import evaluate_reranking_suite
         from unimoe.model.lora_model import UnimodelForExp1
 
-        tokenizer = AutoTokenizer.from_pretrained(
-            config.model.base_model_name, trust_remote_code=True
-        )
-        set_tokenizer_config(tokenizer)
-
-        eval_model = UnimodelForExp1.load_from_checkpoint(
-            config, str(checkpoint_dir), tokenizer=tokenizer
+        # Check what eval work is still needed
+        has_rerank = (results_dir / "reranking_results.json").exists()
+        needs_mteb = (
+            config.training.mode in (TrainingMode.EMB_ONLY, TrainingMode.JOINT_SINGLE)
+            and not (results_dir / "mteb_results.json").exists()
         )
 
-        results_dir.mkdir(parents=True, exist_ok=True)
+        if has_rerank and not needs_mteb:
+            print(f"[eval] All results exist for {run_label}, skipping evaluation.")
+        else:
+            print(f"[eval] Starting evaluation for {run_label} ...")
 
-        # Reranking evaluation (always)
-        rerank_results = evaluate_reranking_suite(eval_model, tokenizer, config)
-        print(f"[eval] {run_label} avg nDCG@10 = {rerank_results['average']['ndcg@10']:.4f}")
-        with open(results_dir / "reranking_results.json", "w") as f:
-            json.dump(rerank_results, f, indent=2)
+            tokenizer = AutoTokenizer.from_pretrained(
+                config.model.base_model_name, trust_remote_code=True
+            )
+            set_tokenizer_config(tokenizer)
 
-        # Embedding evaluation (for EMB_ONLY and JOINT)
-        if config.training.mode in (TrainingMode.EMB_ONLY, TrainingMode.JOINT_SINGLE):
-            print(f"[eval] Running MTEB for {run_label} ...")
-            from unimoe.evaluation.embedding_eval import evaluate_mteb
+            eval_model = UnimodelForExp1.load_from_checkpoint(
+                config, str(checkpoint_dir), tokenizer=tokenizer
+            )
 
-            mteb_results = evaluate_mteb(eval_model, tokenizer, config, output_dir=str(results_dir))
-            with open(results_dir / "mteb_results.json", "w") as f:
-                json.dump(mteb_results, f, indent=2, default=str)
+            results_dir.mkdir(parents=True, exist_ok=True)
 
-        summary["evaluated"] = True
+            # Reranking evaluation
+            if not has_rerank:
+                from unimoe.evaluation.reranking_eval import evaluate_reranking_suite
 
-        del eval_model
-        gc.collect()
-        torch.cuda.empty_cache()
+                rerank_results = evaluate_reranking_suite(eval_model, tokenizer, config)
+                print(f"[eval] {run_label} avg nDCG@10 = {rerank_results['average']['ndcg@10']:.4f}")
+                with open(results_dir / "reranking_results.json", "w") as f:
+                    json.dump(rerank_results, f, indent=2)
+            else:
+                print(f"[eval] Reranking results exist for {run_label}, skipping.")
 
-        vol.commit()
+            # Embedding evaluation (for EMB_ONLY and JOINT)
+            if needs_mteb:
+                print(f"[eval] Running MTEB for {run_label} ...")
+                from unimoe.evaluation.embedding_eval import evaluate_mteb
+
+                mteb_results = evaluate_mteb(eval_model, tokenizer, config, output_dir=str(results_dir))
+                with open(results_dir / "mteb_results.json", "w") as f:
+                    json.dump(mteb_results, f, indent=2, default=str)
+
+            summary["evaluated"] = True
+
+            del eval_model
+            gc.collect()
+            torch.cuda.empty_cache()
+
+            vol.commit()
 
     return summary
 
