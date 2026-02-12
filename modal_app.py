@@ -63,7 +63,7 @@ image = (
         # Evaluation
         "mteb>=2.7.0",
         "pytrec-eval-terrier>=0.5.10",
-        "beir>=2.2.0",
+        # beir removed — BEIR datasets loaded from HuggingFace Hub directly
         "rank-bm25>=0.2.2",
         # Analysis
         "matplotlib>=3.10.0",
@@ -306,17 +306,6 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
     # Evaluation
     # ------------------------------------------------------------------
     _reload_volume()
-
-    # Clean up any corrupt BEIR zip files from previous failed downloads
-    beir_dir = Path("data/beir")
-    if beir_dir.exists():
-        import zipfile
-        for zf in beir_dir.glob("*.zip"):
-            try:
-                zipfile.ZipFile(zf, "r").close()
-            except (zipfile.BadZipFile, Exception):
-                print(f"[eval] Removing corrupt {zf}")
-                zf.unlink()
 
     if (results_dir / "reranking_results.json").exists():
         print(f"[eval] Results exist for {run_label}, skipping evaluation.")

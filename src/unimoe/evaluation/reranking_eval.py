@@ -171,46 +171,37 @@ def evaluate_beir(
 ) -> dict:
     """Evaluate reranking on a BEIR dataset.
 
-    Downloads the dataset, retrieves BM25 top-100 candidates, reranks
-    with the model, and computes nDCG@10 via pytrec_eval.
+    Downloads the dataset from HuggingFace Hub (BeIR/{name}), retrieves
+    BM25 top-100 candidates, reranks with the model, and computes
+    nDCG@10 via pytrec_eval.
 
     Returns dict with per-query and aggregate scores.
     """
-    import time
-    import zipfile
-    from pathlib import Path
-
-    from beir import util as beir_util
-    from beir.datasets.data_loader import GenericDataLoader
+    from datasets import load_dataset as hf_load_dataset
     from rank_bm25 import BM25Okapi
 
     device = config.model.resolve_device()
 
-    # Download and load BEIR dataset (with corrupt-file recovery and retry)
-    beir_dir = Path("data/beir")
-    zip_path = beir_dir / f"{dataset_name}.zip"
-    if zip_path.exists():
-        try:
-            zipfile.ZipFile(zip_path, "r").close()
-        except zipfile.BadZipFile:
-            print(f"[eval] Removing corrupt {zip_path}, will re-download")
-            zip_path.unlink()
+    # Load BEIR dataset from HuggingFace Hub (reliable, cached by HF_HOME)
+    print(f"[eval] Loading {dataset_name} from HuggingFace Hub ...")
+    corpus_ds = hf_load_dataset(f"BeIR/{dataset_name}", "corpus", split="corpus")
+    queries_ds = hf_load_dataset(f"BeIR/{dataset_name}", "queries", split="queries")
+    qrels_ds = hf_load_dataset(f"BeIR/{dataset_name}-qrels", split="test")
 
-    for attempt in range(3):
-        try:
-            data_path = beir_util.download_and_unzip(
-                f"https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{dataset_name}.zip",
-                str(beir_dir),
-            )
-            break
-        except (zipfile.BadZipFile, Exception) as e:
-            if zip_path.exists():
-                zip_path.unlink()
-            if attempt == 2:
-                raise RuntimeError(f"Failed to download {dataset_name} after 3 attempts: {e}") from e
-            print(f"[eval] Download attempt {attempt + 1} failed for {dataset_name}, retrying in 5s...")
-            time.sleep(5)
-    corpus, queries, qrels = GenericDataLoader(data_path).load(split="test")
+    # Build dicts matching GenericDataLoader format
+    corpus = {}
+    for row in corpus_ds:
+        corpus[str(row["_id"])] = {"title": row.get("title", ""), "text": row.get("text", "")}
+
+    queries = {}
+    for row in queries_ds:
+        queries[str(row["_id"])] = row["text"]
+
+    qrels = {}
+    for row in qrels_ds:
+        qid = str(row["query-id"])
+        did = str(row["corpus-id"])
+        qrels.setdefault(qid, {})[did] = int(row["score"])
 
     # BM25 retrieval for top-100 candidates
     corpus_ids = list(corpus.keys())
