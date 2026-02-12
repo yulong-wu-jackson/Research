@@ -201,7 +201,7 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
     import torch
 
     os.chdir(VOLUME_PATH)
-    _reload_volume()
+    # No vol.reload() needed — fresh container, volume mounted from prepare_data's commit.
 
     config_path = _config_path(config_name)
 
@@ -371,8 +371,11 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
                 from unimoe.evaluation.embedding_eval import evaluate_mteb
 
                 mteb_results = evaluate_mteb(eval_model, tokenizer, config, output_dir=str(results_dir))
-                with open(results_dir / "mteb_results.json", "w") as f:
+                # Atomic write: write to tmp file first, rename on success
+                tmp_path = results_dir / "mteb_results.json.tmp"
+                with open(tmp_path, "w") as f:
                     json.dump(mteb_results, f, indent=2, default=str)
+                tmp_path.rename(results_dir / "mteb_results.json")
 
             summary["evaluated"] = True
 

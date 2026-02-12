@@ -123,7 +123,10 @@ class MTEBEncoderWrapper:
         return (e1 @ e2.T).numpy()  # (N, M)
 
     def similarity_pairwise(self, embeddings1: np.ndarray, embeddings2: np.ndarray) -> np.ndarray:
-        """Pairwise cosine similarity between corresponding embeddings."""
+        """Pairwise cosine similarity between corresponding embeddings.
+
+        Assumes L2-normalized inputs (dot product = cosine similarity).
+        """
         import torch as _torch
 
         e1 = _torch.from_numpy(embeddings1).float()
