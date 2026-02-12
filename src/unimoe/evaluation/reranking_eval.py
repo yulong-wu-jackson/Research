@@ -176,17 +176,40 @@ def evaluate_beir(
 
     Returns dict with per-query and aggregate scores.
     """
+    import time
+    import zipfile
+    from pathlib import Path
+
     from beir import util as beir_util
     from beir.datasets.data_loader import GenericDataLoader
     from rank_bm25 import BM25Okapi
 
     device = config.model.resolve_device()
 
-    # Download and load BEIR dataset
-    data_path = beir_util.download_and_unzip(
-        f"https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{dataset_name}.zip",
-        "data/beir",
-    )
+    # Download and load BEIR dataset (with corrupt-file recovery and retry)
+    beir_dir = Path("data/beir")
+    zip_path = beir_dir / f"{dataset_name}.zip"
+    if zip_path.exists():
+        try:
+            zipfile.ZipFile(zip_path, "r").close()
+        except zipfile.BadZipFile:
+            print(f"[eval] Removing corrupt {zip_path}, will re-download")
+            zip_path.unlink()
+
+    for attempt in range(3):
+        try:
+            data_path = beir_util.download_and_unzip(
+                f"https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{dataset_name}.zip",
+                str(beir_dir),
+            )
+            break
+        except (zipfile.BadZipFile, Exception) as e:
+            if zip_path.exists():
+                zip_path.unlink()
+            if attempt == 2:
+                raise RuntimeError(f"Failed to download {dataset_name} after 3 attempts: {e}") from e
+            print(f"[eval] Download attempt {attempt + 1} failed for {dataset_name}, retrying in 5s...")
+            time.sleep(5)
     corpus, queries, qrels = GenericDataLoader(data_path).load(split="test")
 
     # BM25 retrieval for top-100 candidates

@@ -307,6 +307,17 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
     # ------------------------------------------------------------------
     _reload_volume()
 
+    # Clean up any corrupt BEIR zip files from previous failed downloads
+    beir_dir = Path("data/beir")
+    if beir_dir.exists():
+        import zipfile
+        for zf in beir_dir.glob("*.zip"):
+            try:
+                zipfile.ZipFile(zf, "r").close()
+            except (zipfile.BadZipFile, Exception):
+                print(f"[eval] Removing corrupt {zf}")
+                zf.unlink()
+
     if (results_dir / "reranking_results.json").exists():
         print(f"[eval] Results exist for {run_label}, skipping evaluation.")
     elif not checkpoint_dir.exists():
