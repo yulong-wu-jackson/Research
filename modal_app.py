@@ -288,6 +288,13 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
         summary["total_steps"] = result["total_steps"]
         summary["final_loss"] = result["final_loss"]
 
+        # Close log file handlers so volume can reload
+        import logging as _logging
+        _trainer_logger = _logging.getLogger("unimoe.trainer")
+        for handler in _trainer_logger.handlers[:]:
+            handler.close()
+            _trainer_logger.removeHandler(handler)
+
         # Free GPU memory before evaluation
         del trainer, model, emb_loader, rerank_loader
         gc.collect()
