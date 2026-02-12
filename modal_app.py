@@ -154,7 +154,7 @@ def prepare_data(seeds: list[int], config_name: str) -> str:
     image=image,
     volumes={VOLUME_PATH: vol},
     secrets=[modal.Secret.from_dotenv()],
-    gpu=modal.gpu.A100(count=1, size="40GB"),
+    gpu="A100-40GB",
     timeout=10800,
 )
 def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
