@@ -480,10 +480,25 @@ class UnifiedTrainer:
             B, K, S = batch["neg_input_ids"].shape
             neg_ids_flat = batch["neg_input_ids"].view(B * K, S)
             neg_mask_flat = batch["neg_attention_mask"].view(B * K, S)
-            # Encode hard negatives without gradients to save memory.
-            # Standard practice in dense retrieval (DPR, Contriever):
-            # gradients flow through query/positive and in-batch negatives,
-            # but not through explicit hard negatives.
+            # Encode hard negatives WITHOUT gradient tracking to avoid OOM.
+            #
+            # With B=8, K=7, seq_len=256 the negative forward pass stores
+            # ~15 GB of activations for backward (attention scores, MLP
+            # intermediates × 28 layers).  Combined with query/positive
+            # activations and model+optimizer state this exceeds A100-40GB.
+            #
+            # Detaching negatives is standard in dense retrieval:
+            #   - sentence-transformers CachedMNRL / MegaBatchMarginLoss
+            #     encode negatives with torch.no_grad() in memory-efficient mode
+            #   - DPR keeps gradients but uses only 1 hard negative (not 7)
+            #
+            # Gradients still flow through queries, positives, and in-batch
+            # negatives (cross-pair similarities in InfoNCE), which provide
+            # the primary contrastive learning signal.
+            #
+            # TODO: consider GradCache (two-pass) if we need gradients
+            # through hard negatives — see sentence-transformers
+            # CachedMultipleNegativesRankingLoss for reference.
             with torch.no_grad():
                 neg_emb_flat = self.model.encode(neg_ids_flat, neg_mask_flat)
             neg_emb = neg_emb_flat.view(B, K, -1)

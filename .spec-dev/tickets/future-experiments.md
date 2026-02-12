@@ -169,12 +169,30 @@
 - Use Almost Stochastic Order (ASO) from `deep-significance` package for model comparisons
 - Apply Bonferroni correction for multi-dataset comparisons
 
-### F15. CachedMultipleNegativesRankingLoss
+### F15. GradCache for Hard Negative Embeddings
 
-- Implement gradient caching for large effective embedding batch sizes (4096-65536)
-- Current approach: small mini-batches with in-batch negatives only
-- CachedMNRL (from sentence-transformers): two-pass approach enables massive virtual batches with constant GPU memory
-- Significant improvement expected for embedding quality
+**Current state:** Hard negatives are encoded with `torch.no_grad()` in
+`trainer.py:_embedding_step()`. This avoids OOM (56 seqs × 256 len ×
+28 layers stores ~15 GB of backward activations on A100-40GB) but means
+gradients don't flow through hard negatives — only through query,
+positive, and in-batch negatives.
+
+**Design decision rationale (2026-02-12):**
+- sentence-transformers' `CachedMultipleNegativesRankingLoss` uses the
+  same `no_grad` initial pass, then a second mini-batch pass with gradients
+- DPR keeps full gradients but only uses 1 hard negative (not 7)
+- For the kill gate experiment measuring task interference, the simpler
+  approach is sufficient — absolute retrieval performance is not the goal
+- References: [sentence-transformers CachedMNRL](https://github.com/UKPLab/sentence-transformers),
+  [DPR](https://github.com/facebookresearch/DPR)
+
+**Future improvement:** Implement GradCache (two-pass) to restore
+gradients through hard negatives while keeping memory bounded:
+1. Pass 1: encode all negatives with `no_grad`, cache embeddings
+2. Compute loss and backprop to embedding level, cache embedding gradients
+3. Pass 2: re-encode in mini-batches with gradients, chain cached gradients
+- This enables massive virtual batch sizes (4096-65536) with constant GPU memory
+- Significant improvement expected for embedding quality in final paper experiments
 
 ### F16. Matryoshka Representation Learning
 
