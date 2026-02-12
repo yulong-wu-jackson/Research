@@ -194,6 +194,14 @@ gradients through hard negatives while keeping memory bounded:
 - This enables massive virtual batch sizes (4096-65536) with constant GPU memory
 - Significant improvement expected for embedding quality in final paper experiments
 
+**Ablation experiment:** Compare three configurations to quantify the
+impact of hard negative gradient flow on embedding quality and TIR:
+1. `no_grad` on hard negatives (current — cheap, standard practice)
+2. GradCache two-pass (gradients through hard negatives, same memory)
+3. Full gradients on A100-80GB (ground truth, expensive)
+Report nDCG@10 (retrieval) and TIR for each to confirm that the
+`no_grad` simplification does not distort the kill gate conclusion.
+
 ### F16. Matryoshka Representation Learning
 
 - Train the model to produce embeddings that can be truncated to smaller dimensions (1024→512→256→128→64)
