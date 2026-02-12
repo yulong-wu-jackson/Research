@@ -175,7 +175,7 @@ class UnifiedTrainer:
                     "total_steps": self.total_steps,
                 },
                 tags=[self.mode.value, f"seed_{self.config.seed}"],
-                reinit=True,
+                reinit="finish_previous",
             )
             self._wandb = wandb
         except Exception as e:
