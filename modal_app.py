@@ -76,7 +76,12 @@ image = (
         # Tracking
         "wandb>=0.19.0",
     )
-    .env({"PYTHONPATH": "/root/src", "HF_HOME": "/vol/hf_cache"})
+    .env({
+        "PYTHONPATH": "/root/src",
+        "HF_HOME": "/vol/hf_cache",
+        "WANDB_DIR": "/tmp/wandb",      # keep wandb files OFF the volume
+        "WANDB_TIMEOUT": "60",           # prevent wandb.finish() from hanging
+    })
     .add_local_dir("src", remote_path="/root/src")
     .add_local_dir("configs", remote_path="/root/configs")
 )
@@ -490,10 +495,19 @@ def main(quick: bool = False):
         for yaml_name in configs.values()
         for seed in seeds
     ]
-    results = list(train_and_evaluate.starmap(args_list))
+    results = []
+    for r in train_and_evaluate.starmap(args_list, return_exceptions=True):
+        if isinstance(r, Exception):
+            print(f"  WARNING: A job failed: {r}")
+            results.append({"config": "?", "seed": "?", "trained": False, "evaluated": False, "error": str(r)})
+        else:
+            results.append(r)
 
     print("\n--- Per-run summaries ---")
     for r in results:
+        if "error" in r:
+            print(f"  FAILED: {r['error'][:120]}")
+            continue
         status_parts = []
         if r["trained"]:
             status_parts.append(f"trained (steps={r.get('total_steps', '?')})")
