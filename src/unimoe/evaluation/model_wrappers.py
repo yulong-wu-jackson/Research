@@ -111,22 +111,24 @@ class MTEBEncoderWrapper:
         return np.concatenate(all_embeddings, axis=0)
 
     def similarity(self, embeddings1: np.ndarray, embeddings2: np.ndarray) -> np.ndarray:
-        """Cosine similarity between two sets of embeddings."""
+        """Cosine similarity between two sets of embeddings.
+
+        Since embeddings are L2-normalized, cosine_sim = dot product.
+        Uses matrix multiplication to avoid O(N*M*D) memory broadcast.
+        """
         import torch as _torch
 
-        e1 = _torch.from_numpy(embeddings1)
-        e2 = _torch.from_numpy(embeddings2)
-        return _torch.nn.functional.cosine_similarity(
-            e1.unsqueeze(1), e2.unsqueeze(0), dim=2
-        ).numpy()
+        e1 = _torch.from_numpy(embeddings1).float()
+        e2 = _torch.from_numpy(embeddings2).float()
+        return (e1 @ e2.T).numpy()  # (N, M)
 
     def similarity_pairwise(self, embeddings1: np.ndarray, embeddings2: np.ndarray) -> np.ndarray:
         """Pairwise cosine similarity between corresponding embeddings."""
         import torch as _torch
 
-        e1 = _torch.from_numpy(embeddings1)
-        e2 = _torch.from_numpy(embeddings2)
-        return _torch.nn.functional.cosine_similarity(e1, e2, dim=1).numpy()
+        e1 = _torch.from_numpy(embeddings1).float()
+        e2 = _torch.from_numpy(embeddings2).float()
+        return (e1 * e2).sum(dim=1).numpy()  # (N,)
 
 
 class MTEBCrossEncoderWrapper:
