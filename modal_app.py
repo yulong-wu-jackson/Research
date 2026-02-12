@@ -129,7 +129,7 @@ def prepare_data(seeds: list[int], config_name: str) -> str:
     AutoModelForCausalLM.from_pretrained(
         config.model.base_model_name,
         trust_remote_code=True,
-        torch_dtype="auto",
+        dtype="auto",
     )
     print("[prepare_data] Model cached.")
 
