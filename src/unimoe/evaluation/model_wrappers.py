@@ -106,7 +106,7 @@ class MTEBEncoderWrapper:
                 embeddings = self.model.encode(
                     encoded["input_ids"], encoded["attention_mask"]
                 )
-                all_embeddings.append(embeddings.cpu().numpy())
+                all_embeddings.append(embeddings.cpu().float().numpy())
 
         return np.concatenate(all_embeddings, axis=0)
 
@@ -218,6 +218,6 @@ class MTEBCrossEncoderWrapper:
                 attention_mask_t = torch.tensor(attention_masks, dtype=torch.long).to(self.device)
 
                 scores = self.model.rerank(input_ids_t, attention_mask_t)
-                all_scores.append(scores.cpu().numpy())
+                all_scores.append(scores.cpu().float().numpy())
 
         return np.concatenate(all_scores, axis=0)
