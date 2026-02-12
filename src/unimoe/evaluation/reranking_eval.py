@@ -171,37 +171,37 @@ def evaluate_beir(
 ) -> dict:
     """Evaluate reranking on a BEIR dataset.
 
-    Downloads the dataset from HuggingFace Hub (BeIR/{name}), retrieves
-    BM25 top-100 candidates, reranks with the model, and computes
-    nDCG@10 via pytrec_eval.
+    Loads the dataset via MTEB (from HuggingFace Hub), retrieves BM25
+    top-100 candidates, reranks with the model, and computes nDCG@10
+    via pytrec_eval.
 
     Returns dict with per-query and aggregate scores.
     """
-    from datasets import load_dataset as hf_load_dataset
+    import mteb
     from rank_bm25 import BM25Okapi
 
     device = config.model.resolve_device()
 
-    # Load BEIR dataset from HuggingFace Hub (reliable, cached by HF_HOME)
-    print(f"[eval] Loading {dataset_name} from HuggingFace Hub ...")
-    corpus_ds = hf_load_dataset(f"BeIR/{dataset_name}", "corpus", split="corpus")
-    queries_ds = hf_load_dataset(f"BeIR/{dataset_name}", "queries", split="queries")
-    qrels_ds = hf_load_dataset(f"BeIR/{dataset_name}-qrels", split="test")
+    # Load BEIR dataset via MTEB (reliable HuggingFace Hub download)
+    print(f"[eval] Loading {dataset_name} via MTEB ...")
+    task = list(mteb.get_tasks(tasks=[dataset_name]))[0]
+    task.load_data()
+    test_data = task.dataset["default"]["test"]
 
-    # Build dicts matching GenericDataLoader format
+    # Build dicts from MTEB's HuggingFace Dataset objects
     corpus = {}
-    for row in corpus_ds:
-        corpus[str(row["_id"])] = {"title": row.get("title", ""), "text": row.get("text", "")}
+    for row in test_data["corpus"]:
+        corpus[str(row["id"])] = {"title": row.get("title", ""), "text": row.get("text", "")}
 
     queries = {}
-    for row in queries_ds:
-        queries[str(row["_id"])] = row["text"]
+    for row in test_data["queries"]:
+        queries[str(row["id"])] = row["text"]
 
-    qrels = {}
-    for row in qrels_ds:
-        qid = str(row["query-id"])
-        did = str(row["corpus-id"])
-        qrels.setdefault(qid, {})[did] = int(row["score"])
+    # relevant_docs is already a dict[str, dict[str, int]]
+    qrels = {
+        str(qid): {str(did): int(rel) for did, rel in docs.items()}
+        for qid, docs in test_data["relevant_docs"].items()
+    }
 
     # BM25 retrieval for top-100 candidates
     corpus_ids = list(corpus.keys())
