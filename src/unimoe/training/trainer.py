@@ -480,7 +480,12 @@ class UnifiedTrainer:
             B, K, S = batch["neg_input_ids"].shape
             neg_ids_flat = batch["neg_input_ids"].view(B * K, S)
             neg_mask_flat = batch["neg_attention_mask"].view(B * K, S)
-            neg_emb_flat = self.model.encode(neg_ids_flat, neg_mask_flat)
+            # Encode hard negatives without gradients to save memory.
+            # Standard practice in dense retrieval (DPR, Contriever):
+            # gradients flow through query/positive and in-batch negatives,
+            # but not through explicit hard negatives.
+            with torch.no_grad():
+                neg_emb_flat = self.model.encode(neg_ids_flat, neg_mask_flat)
             neg_emb = neg_emb_flat.view(B, K, -1)
 
         return self.emb_loss_fn(query_emb, pos_emb, neg_emb)
