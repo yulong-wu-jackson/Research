@@ -92,12 +92,19 @@ def _config_path(yaml_name: str) -> str:
 
 
 def _reload_volume():
-    """Reload the Modal volume, stepping out of /vol to avoid open-file errors."""
+    """Reload the Modal volume.
+
+    Must be called after all DataLoader workers and file handles on /vol
+    are closed.  Temporarily moves CWD out of the volume mount so the
+    kernel has no references into the volume filesystem.
+    """
     import os
     cwd = os.getcwd()
     os.chdir("/tmp")
-    vol.reload()
-    os.chdir(cwd)
+    try:
+        vol.reload()
+    finally:
+        os.chdir(cwd)
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +259,7 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
                 collate_fn=emb_collator,
                 drop_last=True,
                 num_workers=4,
-                persistent_workers=True,
+                # persistent_workers disabled: workers must terminate before vol.reload()
                 generator=torch.Generator().manual_seed(seed),
             )
 
@@ -266,7 +273,7 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
                 collate_fn=rerank_collator,
                 drop_last=True,
                 num_workers=4,
-                persistent_workers=True,
+                # persistent_workers disabled: workers must terminate before vol.reload()
                 generator=torch.Generator().manual_seed(seed + 1),
             )
 
@@ -295,7 +302,9 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
             handler.close()
             _trainer_logger.removeHandler(handler)
 
-        # Free GPU memory before evaluation
+        # Free GPU memory and terminate DataLoader worker processes
+        # before volume operations.  Workers must be fully stopped or
+        # vol.commit/reload will fail ("open files" / "cwd inside volume").
         del trainer, model, emb_loader, rerank_loader
         gc.collect()
         torch.cuda.empty_cache()
