@@ -312,9 +312,8 @@ def train_and_evaluate(config_name: str, seed: int, eval_tier: str) -> dict:
         vol.commit()
 
     # ------------------------------------------------------------------
-    # Evaluation
+    # Evaluation (same container — no vol.reload() needed, files are local)
     # ------------------------------------------------------------------
-    _reload_volume()
 
     if (results_dir / "reranking_results.json").exists():
         print(f"[eval] Results exist for {run_label}, skipping evaluation.")
