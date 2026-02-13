@@ -71,9 +71,8 @@ def evaluate_mteb(
     if result and hasattr(result, "task_results"):
         for task_result in result.task_results:
             task_name = task_result.task_name
-            scores = task_result.get_scores()
-            if scores:
-                task_scores[task_name] = scores
+            main_score = task_result.get_score()
+            task_scores[task_name] = {"main_score": main_score}
 
     return {
         "per_task": task_scores,
